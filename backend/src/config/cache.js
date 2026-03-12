@@ -8,9 +8,9 @@ const connectRedis = () => {
     maxRetriesPerRequest: 3,
   });
 
-  redis.on("connect", () => console.log("✅ Redis connected"));
-  redis.on("error", (err) => console.error("❌ Redis error:", err.message));
-  redis.on("close", () => console.warn("⚠️  Redis disconnected"));
+  redis.on("connect", () => console.log("Redis connected"));
+  redis.on("error", (err) => console.error("Redis error:", err.message));
+  redis.on("close", () => console.warn("Redis disconnected"));
 
   return redis;
 };
