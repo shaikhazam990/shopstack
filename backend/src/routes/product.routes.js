@@ -18,3 +18,6 @@ router.put("/:id", protect, adminOnly, updateProductValidator, validate, updateP
 router.delete("/:id", protect, adminOnly, deleteProduct);
 
 module.exports = router;
+
+
+
