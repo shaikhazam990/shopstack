@@ -1,108 +1,194 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getProducts } from "../../products/services/product.api";
-import ProductCard from "../../products/components/ProductCard";
+import { useDispatch } from "react-redux";
+import { addToCart, openCart } from "../../../store/cartSlice";
 import Loader from "../../../shared/components/Loader";
-import { formatPrice } from "../../../shared/utils/formatPrice";
 import styles from "./HomePage.module.css";
 
-const MOODS = [
-  { label: "Minimal", emoji: "🤍", query: "minimal" },
-  { label: "Party", emoji: "🎉", query: "party" },
-  { label: "Casual", emoji: "☕", query: "casual" },
+const FEATURED_CATEGORIES = [
+  { name: "Smartphones", emoji: "📱", color: "#e8f0f7", tag: "Latest drops" },
+  { name: "Laptops", emoji: "💻", color: "#f0ede8", tag: "Work & create" },
+  { name: "Fragrances", emoji: "🌸", color: "#f7eef0", tag: "Smell amazing" },
+  { name: "Furniture", emoji: "🛋️", color: "#eef7f0", tag: "Your space" },
 ];
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const [trending, setTrending] = useState([]);
+  const dispatch = useDispatch();
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeMood, setActiveMood] = useState(null);
+  const [addingId, setAddingId] = useState(null);
+  const [heroVisible, setHeroVisible] = useState(false);
+  const heroRef = useRef(null);
 
   useEffect(() => {
-    getProducts({ sort: "popular", limit: 6 })
-      .then(({ data }) => setTrending(data.data.products))
+    const timer = setTimeout(() => setHeroVisible(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/products?sort=popular&limit=6`)
+      .then(r => r.json())
+      .then(d => setProducts(d.data?.products || []))
+      .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleMood = (mood) => {
-    setActiveMood(mood.label);
-    navigate(`/products?search=${mood.query}`);
+  const handleAddToCart = async (e, product) => {
+    e.preventDefault();
+    setAddingId(product._id);
+    await dispatch(addToCart({ productId: product._id, quantity: 1 }));
+    dispatch(openCart());
+    setTimeout(() => setAddingId(null), 1200);
   };
+
+  const getImage = (p) => p.images?.find(i => i.isPrimary)?.url || p.images?.[0]?.url;
 
   return (
     <div className={styles.page}>
-      {/* Hero Banner */}
-      <div className={styles.hero}>
-        <div className={styles.heroContent}>
-          <span className={styles.heroBadge}>NEW COLLECTION</span>
-          <h1 className={styles.heroTitle}>Defined by Detail,<br />Refined by You</h1>
-          <p className={styles.heroSub}>Curated premium products for every lifestyle</p>
-          <Link to="/products" className={styles.heroBtn}>Shop Now →</Link>
-        </div>
-        <div className={styles.heroGradient} />
+
+      {/* Announcement */}
+      <div className={styles.announcement}>
+        <span>🌿</span>
+        <p>Free shipping on orders over $500 · Easy 30-day returns</p>
+        <span>🌿</span>
       </div>
 
-      {/* Shop by Category */}
+      {/* Hero */}
+      <section className={`${styles.hero} ${heroVisible ? styles.heroVisible : ""}`} ref={heroRef}>
+        <div className={styles.heroInner}>
+          <div className={styles.heroText}>
+            <span className={styles.heroEyebrow}>New Collection — 2026</span>
+            <h1 className={styles.heroTitle}>
+              Defined<br />
+              <em>by Detail.</em>
+            </h1>
+            <p className={styles.heroBody}>
+              Thoughtfully made products for people who care about quality, sustainability, and style.
+            </p>
+            <div className={styles.heroCtas}>
+              <Link to="/products" className={styles.heroPrimary}>Shop Now</Link>
+              <Link to="/products?sort=newest" className={styles.heroSecondary}>New Arrivals →</Link>
+            </div>
+          </div>
+          <div className={styles.heroVisual}>
+            <div className={styles.heroOrb} />
+            <div className={styles.heroOrb2} />
+            <div className={styles.floatingCard}>
+              <span>⭐ 4.9</span>
+              <p>50k+ happy customers</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className={styles.heroStats}>
+          {[["100+", "Brands"], ["50k+", "Customers"], ["4.9★", "Avg Rating"], ["Free", "Returns"]].map(([val, label]) => (
+            <div key={label} className={styles.stat}>
+              <strong>{val}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Featured Categories */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Shop by Category</h2>
-          <Link to="/products" className={styles.seeAll}>See all</Link>
+          <Link to="/products" className={styles.seeAll}>See all →</Link>
         </div>
-        <div className={styles.categoryGrid}>
-          {[
-            { name: "Watches", icon: "⌚", color: "#e8f3fe" },
-            { name: "Audio", icon: "🎧", color: "#f0fdf4" },
-            { name: "Shoes", icon: "👟", color: "#fff7ed" },
-            { name: "Cameras", icon: "📷", color: "#fdf4ff" },
-          ].map((cat) => (
-            <Link key={cat.name} to={`/products?category=${cat.name.toLowerCase()}`} className={styles.catCard} style={{ background: cat.color }}>
-              <span className={styles.catIcon}>{cat.icon}</span>
-              <span className={styles.catName}>{cat.name}</span>
+        <div className={styles.catGrid}>
+          {FEATURED_CATEGORIES.map((cat, i) => (
+            <Link
+              key={cat.name}
+              to={`/products?category=${cat.name.toLowerCase()}`}
+              className={styles.catCard}
+              style={{ background: cat.color, animationDelay: `${i * 80}ms` }}
+            >
+              <span className={styles.catEmoji}>{cat.emoji}</span>
+              <div>
+                <p className={styles.catName}>{cat.name}</p>
+                <p className={styles.catTag}>{cat.tag}</p>
+              </div>
+              <span className={styles.catArrow}>→</span>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Mood Picker */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>How are you feeling today?</h2>
-        <p className={styles.sectionSub}>We'll match products to your mood</p>
-        <div className={styles.moods}>
-          {MOODS.map((mood) => (
-            <button
-              key={mood.label}
-              className={`${styles.moodBtn} ${activeMood === mood.label ? styles.moodActive : ""}`}
-              onClick={() => handleMood(mood)}
-            >
-              <span>{mood.emoji}</span>
-              <span>{mood.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Trending Products */}
+      {/* Trending */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Currently Trending</h2>
-          <Link to="/products?sort=popular" className={styles.seeAll}>See all</Link>
+          <div>
+            <h2 className={styles.sectionTitle}>Trending Now</h2>
+            <p className={styles.sectionSub}>What everyone's adding to cart</p>
+          </div>
+          <Link to="/products?sort=popular" className={styles.seeAll}>See all →</Link>
         </div>
+
         {loading ? (
           <Loader />
         ) : (
-          <div className={styles.productGrid}>
-            {trending.map((p) => <ProductCard key={p._id} product={p} />)}
+          <div className={styles.productScroll}>
+            {products.map((product, i) => (
+              <Link
+                key={product._id}
+                to={`/products/${product.slug}`}
+                className={styles.productCard}
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                <div className={styles.productImageWrap}>
+                  {product.badge && <span className={styles.productBadge}>{product.badge}</span>}
+                  <img src={getImage(product)} alt={product.name} className={styles.productImage} loading="lazy" />
+                  <button
+                    className={styles.productQuickAdd}
+                    onClick={(e) => handleAddToCart(e, product)}
+                  >
+                    {addingId === product._id ? "✓" : "+"}
+                  </button>
+                </div>
+                <div className={styles.productInfo}>
+                  <p className={styles.productName}>{product.name}</p>
+                  <div className={styles.productBottom}>
+                    <span className={styles.productPrice}>${product.price?.toFixed(2)}</span>
+                    <span className={styles.productRating}>★ {product.ratings?.average?.toFixed(1)}</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         )}
       </section>
 
+      {/* Value Props */}
+      <section className={styles.valueProps}>
+        {[
+          { icon: "🚚", title: "Free Shipping", sub: "On orders over $500" },
+          { icon: "↩️", title: "Easy Returns", sub: "30-day return policy" },
+          { icon: "🔒", title: "Secure Payment", sub: "256-bit encryption" },
+          { icon: "💬", title: "24/7 Support", sub: "Always here to help" },
+        ].map(({ icon, title, sub }) => (
+          <div key={title} className={styles.valueProp}>
+            <span className={styles.valuePropIcon}>{icon}</span>
+            <div>
+              <p className={styles.valuePropTitle}>{title}</p>
+              <p className={styles.valuePropSub}>{sub}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
       {/* Newsletter */}
       <section className={styles.newsletter}>
-        <h3>Get exclusive deals</h3>
-        <p>Subscribe for early access to new arrivals</p>
-        <div className={styles.newsletterRow}>
-          <input type="email" placeholder="your@email.com" />
-          <button>Subscribe</button>
+        <div className={styles.newsletterInner}>
+          <span className={styles.newsletterBadge}>Stay in the loop</span>
+          <h3 className={styles.newsletterTitle}>Get early access to new drops</h3>
+          <p className={styles.newsletterSub}>Join 50,000+ subscribers. No spam, ever.</p>
+          <div className={styles.newsletterForm}>
+            <input type="email" placeholder="your@email.com" />
+            <button>Subscribe</button>
+          </div>
         </div>
       </section>
 

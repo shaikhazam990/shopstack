@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const Category = require("../models/Category"); // ✅ Fix 1: Category import
 const { cache } = require("../config/cache");
 const { uploadToCloudinary } = require("../middlewares/upload.middleware");
 const { generateEmbedding, cosineSimilarity, generateProductDescription, askProductAssistant, askProductAssistantStream } = require("../services/ai.service");
@@ -13,7 +14,19 @@ const getProducts = async (req, res, next) => {
     if (cached) return res.json(cached);
 
     const filter = { isActive: true };
-    if (category) filter.category = category;
+
+    // ✅ Fix 2: category string → ObjectId via slug or name lookup
+    if (category) {
+      const cat = await Category.findOne({
+        $or: [
+          { slug: category.toLowerCase() },
+          { name: new RegExp(`^${category}$`, "i") },
+        ],
+      });
+      if (cat) filter.category = cat._id;
+      else filter.category = new mongoose.Types.ObjectId(); // no match → empty results
+    }
+
     if (badge) filter.badge = badge;
     if (featured) filter.isFeatured = true;
     if (minPrice || maxPrice) {
@@ -21,7 +34,15 @@ const getProducts = async (req, res, next) => {
       if (minPrice) filter.price.$gte = Number(minPrice);
       if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
-    if (search) filter.$text = { $search: search };
+
+    // ✅ Fix 3: regex search instead of $text (no index needed)
+    if (search) {
+      filter.$or = [
+        { name: new RegExp(search, "i") },
+        { description: new RegExp(search, "i") },
+        { tags: new RegExp(search, "i") },
+      ];
+    }
 
     const sortMap = {
       newest: { createdAt: -1 },
@@ -47,7 +68,7 @@ const getProducts = async (req, res, next) => {
       data: { products, total, page: Number(page), pages: Math.ceil(total / Number(limit)) },
     };
 
-    await cache.set(cacheKey, response, 300); // 5 min cache
+    await cache.set(cacheKey, response, 300);
     res.json(response);
   } catch (error) {
     next(error);
@@ -69,7 +90,6 @@ const getProduct = async (req, res, next) => {
 
     if (!product) return res.status(404).json({ success: false, message: "Product not found" });
 
-    // Increment view count (don't await)
     Product.findByIdAndUpdate(product._id, { $inc: { viewCount: 1 } }).exec();
 
     const response = { success: true, data: product };
@@ -85,7 +105,6 @@ const createProduct = async (req, res, next) => {
   try {
     const data = { ...req.body };
 
-    // Upload images to Cloudinary
     if (req.files?.length) {
       data.images = await Promise.all(
         req.files.map(async (file, i) => {
@@ -95,14 +114,12 @@ const createProduct = async (req, res, next) => {
       );
     }
 
-    // Auto-generate description if not provided
     if (!data.description && data.name) {
       data.description = await generateProductDescription(data);
     }
 
     const product = await Product.create(data);
 
-    // Generate and store embedding for AI search
     const embeddingText = `${product.name} ${product.description} ${product.tags?.join(" ")}`;
     const embedding = await generateEmbedding(embeddingText);
     await Product.findByIdAndUpdate(product._id, { embedding });
@@ -152,7 +169,7 @@ const addReview = async (req, res, next) => {
     if (alreadyReviewed) return res.status(400).json({ success: false, message: "You already reviewed this product" });
 
     product.reviews.push({ user: req.user._id, name: req.user.name, avatar: req.user.avatar, ...req.body });
-    product.updateRating();
+    product.updateRating?.();
     await product.save();
 
     await cache.del(`product:${product.slug}`);
@@ -162,7 +179,7 @@ const addReview = async (req, res, next) => {
   }
 };
 
-// POST /api/products/:id/ask — Smart Assistant
+// POST /api/products/:id/ask
 const askAssistant = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id).populate("category", "name");
@@ -170,7 +187,6 @@ const askAssistant = async (req, res, next) => {
 
     const { question, messages } = req.body;
 
-    // Streaming response
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -186,7 +202,7 @@ const askAssistant = async (req, res, next) => {
   }
 };
 
-// GET /api/products/:id/recommendations — AI Recommendations
+// GET /api/products/:id/recommendations
 const getRecommendations = async (req, res, next) => {
   try {
     const cacheKey = `recommendations:${req.params.id}`;
@@ -194,15 +210,18 @@ const getRecommendations = async (req, res, next) => {
     if (cached) return res.json(cached);
 
     const product = await Product.findById(req.params.id).select("embedding name category");
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
     if (!product?.embedding?.length) {
-      // Fallback to same category
       const fallback = await Product.find({ category: product.category, _id: { $ne: product._id }, isActive: true })
         .limit(4)
         .select("name price images ratings slug");
       return res.json({ success: true, data: fallback });
     }
 
-    const allProducts = await Product.find({ _id: { $ne: product._id }, isActive: true }).select("name price images ratings slug embedding");
+    const allProducts = await Product.find({ _id: { $ne: product._id }, isActive: true })
+      .select("name price images ratings slug embedding");
+
     const scored = allProducts
       .filter((p) => p.embedding?.length)
       .map((p) => ({ ...p.toObject(), score: cosineSimilarity(product.embedding, p.embedding) }))

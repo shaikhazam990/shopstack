@@ -1,5 +1,5 @@
-export const formatPrice = (amount, currency = "USD") =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
+export const formatPrice = (amount, currency = "INR") =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
 
 export const formatDiscount = (original, sale) =>
   Math.round(((original - sale) / original) * 100);

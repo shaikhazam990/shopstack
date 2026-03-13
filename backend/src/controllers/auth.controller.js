@@ -29,7 +29,12 @@ const register = async (req, res, next) => {
     const verifyToken = crypto.randomBytes(32).toString("hex");
     const user = await User.create({ name, email, password, emailVerifyToken: verifyToken });
 
-    await sendVerificationEmail(user, verifyToken);
+    // ✅ Email failure should NOT block registration
+    try {
+      await sendVerificationEmail(user, verifyToken);
+    } catch (emailErr) {
+      console.warn("⚠️  Verification email failed (non-critical):", emailErr.message);
+    }
 
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshToken = refreshToken;
@@ -39,7 +44,7 @@ const register = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: "Registered successfully. Please verify your email.",
+      message: "Registered successfully.",
       accessToken,
       user,
     });
@@ -132,10 +137,16 @@ const forgotPassword = async (req, res, next) => {
 
     const token = crypto.randomBytes(32).toString("hex");
     user.passwordResetToken = token;
-    user.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+    user.passwordResetExpires = Date.now() + 60 * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
-    await sendPasswordResetEmail(user, token);
+    // ✅ Email failure should NOT block password reset flow
+    try {
+      await sendPasswordResetEmail(user, token);
+    } catch (emailErr) {
+      console.warn("⚠️  Reset email failed (non-critical):", emailErr.message);
+    }
+
     res.json({ success: true, message: "Password reset email sent" });
   } catch (error) {
     next(error);

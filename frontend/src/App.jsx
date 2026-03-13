@@ -5,7 +5,6 @@ import { fetchMe } from "./store/authSlice";
 import { fetchCart } from "./store/cartSlice";
 import AppRoutes from "./app.routes";
 import Navbar from "./shared/components/Navbar";
-import BottomNav from "./shared/components/BottomNav";
 import CartDrawer from "./features/cart/components/CartDrawer";
 
 const AppContent = () => {
@@ -24,17 +23,21 @@ const AppContent = () => {
   return (
     <>
       <Navbar />
-      <main style={{ maxWidth: "480px", margin: "0 auto" }}>
+      <main>
         <AppRoutes />
       </main>
-      <BottomNav />
       <CartDrawer />
     </>
   );
 };
 
 const App = () => (
-  <BrowserRouter>
+  <BrowserRouter
+    future={{
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    }}
+  >
     <AppContent />
   </BrowserRouter>
 );
