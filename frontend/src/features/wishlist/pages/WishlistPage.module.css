@@ -1,0 +1,32 @@
+.page { padding: 20px 16px 80px; }
+.headerRow { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.title { font-size:24px; font-weight:700; }
+.addBtn { width:36px; height:36px; background:var(--primary); color:white; border:none; border-radius:50%; font-size:22px; display:flex; align-items:center; justify-content:center; }
+.createCard { background:white; border-radius:16px; padding:18px; box-shadow:var(--shadow-md); margin-bottom:16px; }
+.createCard h3 { font-size:16px; font-weight:700; margin-bottom:14px; }
+.iconRow { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.iconBtn { font-size:22px; padding:6px; border:2px solid transparent; border-radius:10px; background:var(--bg); }
+.iconActive { border-color:var(--primary); background:var(--primary-light); }
+.nameInput { width:100%; border:1.5px solid var(--border); border-radius:10px; padding:12px; font-size:14px; outline:none; margin-bottom:12px; }
+.nameInput:focus { border-color:var(--primary); }
+.createActions { display:flex; gap:8px; justify-content:flex-end; }
+.cancelBtn { padding:10px 18px; border:1px solid var(--border); border-radius:10px; background:white; font-size:14px; }
+.saveBtn { padding:10px 18px; background:var(--primary); color:white; border:none; border-radius:10px; font-size:14px; font-weight:600; }
+.empty { text-align:center; padding:60px 20px; color:var(--text-secondary); display:flex; flex-direction:column; align-items:center; gap:10px; }
+.createFirstBtn { padding:12px 24px; background:var(--primary); color:white; border:none; border-radius:12px; font-size:14px; font-weight:600; margin-top:8px; }
+.folderTabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:20px; scrollbar-width:none; }
+.folderTabs::-webkit-scrollbar { display:none; }
+.folderTab { display:flex; align-items:center; gap:6px; padding:10px 16px; background:white; border:1.5px solid var(--border); border-radius:12px; white-space:nowrap; font-size:14px; font-weight:500; }
+.folderActive { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
+.folderCount { background:var(--border); border-radius:20px; padding:1px 7px; font-size:11px; }
+.folderActive .folderCount { background:var(--primary); color:white; }
+.products { display:flex; flex-direction:column; gap:12px; }
+.emptyFolder { text-align:center; padding:40px 20px; color:var(--text-secondary); font-size:14px; }
+.productRow { display:flex; align-items:center; gap:12px; background:white; padding:12px; border-radius:14px; box-shadow:var(--shadow); }
+.productImg { width:60px; height:60px; border-radius:10px; object-fit:cover; background:#f1f5f9; flex-shrink:0; }
+.productInfo { flex:1; min-width:0; }
+.productName { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.productPrice { font-size:14px; color:var(--primary); font-weight:700; margin-top:3px; }
+.productActions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.viewBtn { padding:7px 14px; background:var(--primary); color:white; border-radius:8px; font-size:12px; font-weight:600; }
+.removeBtn { width:32px; height:32px; border:none; background:var(--bg); border-radius:8px; font-size:16px; color:#ef4444; }
