@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import apiClient from "../shared/utils/apiClient";
+import { googleAuthApi } from "../features/auth/services/auth.api";
 
 export const fetchMe = createAsyncThunk("auth/fetchMe", async (_, { rejectWithValue }) => {
   try {
@@ -30,8 +31,18 @@ export const register = createAsyncThunk("auth/register", async (userData, { rej
   }
 });
 
+export const googleLogin = createAsyncThunk("auth/googleLogin", async (credential, { rejectWithValue }) => {
+  try {
+    const { data } = await googleAuthApi(credential);
+    localStorage.setItem("accessToken", data.accessToken);
+    return data.user;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || "Google login failed");
+  }
+});
+
 export const logout = createAsyncThunk("auth/logout", async () => {
-  await apiClient.post("/auth/logout");
+  try { await apiClient.post("/auth/logout"); } catch (_) {}
   localStorage.removeItem("accessToken");
 });
 
@@ -44,14 +55,16 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchMe.pending, (state) => { state.loading = true; })
+      .addCase(fetchMe.pending,   (state) => { state.loading = true; })
       .addCase(fetchMe.fulfilled, (state, action) => { state.user = action.payload; state.loading = false; })
-      .addCase(fetchMe.rejected, (state) => { state.loading = false; })
-      .addCase(login.fulfilled, (state, action) => { state.user = action.payload; state.error = null; })
-      .addCase(login.rejected, (state, action) => { state.error = action.payload; })
-      .addCase(register.fulfilled, (state, action) => { state.user = action.payload; state.error = null; })
+      .addCase(fetchMe.rejected,  (state) => { state.loading = false; })
+      .addCase(login.fulfilled,   (state, action) => { state.user = action.payload; state.error = null; })
+      .addCase(login.rejected,    (state, action) => { state.error = action.payload; })
+      .addCase(register.fulfilled,(state, action) => { state.user = action.payload; state.error = null; })
       .addCase(register.rejected, (state, action) => { state.error = action.payload; })
-      .addCase(logout.fulfilled, (state) => { state.user = null; });
+      .addCase(googleLogin.fulfilled, (state, action) => { state.user = action.payload; state.error = null; })
+      .addCase(googleLogin.rejected,  (state, action) => { state.error = action.payload; })
+      .addCase(logout.fulfilled,  (state) => { state.user = null; });
   },
 });
 

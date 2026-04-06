@@ -19,6 +19,29 @@
   --success: #10b981;
   --error: #ef4444;
   --warning: #f59e0b;
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.2);
+}
+
+html.dark {
+  --primary: #3b9fff;
+  --primary-light: #162436;
+  --primary-dark: #60aeff;
+  --bg: #0f1115;
+  --bg-white: #16181d;
+  --text: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #2a2e37;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --glass-bg: rgba(22, 24, 29, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Transitions for smooth theme switching */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {

@@ -1,7 +1,7 @@
 require("dotenv").config();
 const http = require("http");
 const { Server } = require("socket.io");
-const app = require("./app"); // ✅ Fixed: was "./src/app"
+const app = require("./src/app"); // ✅ app.js is inside src/
 
 const server = http.createServer(app);
 
@@ -22,8 +22,8 @@ io.on("connection", (socket) => {
 
   socket.on("assistant:message", async ({ productId, messages }) => {
     try {
-      const Product = require("./models/Product");
-      const { askProductAssistantStream } = require("./services/ai.service");
+      const Product = require("./src/models/Product");
+      const { askProductAssistantStream } = require("./src/services/ai.service");
       const product = await Product.findById(productId).populate("category", "name");
       if (!product) return socket.emit("assistant:error", "Product not found");
       socket.emit("assistant:start");
@@ -38,7 +38,7 @@ io.on("connection", (socket) => {
 
   socket.on("product:checkStock", async ({ productId }) => {
     try {
-      const Product = require("./models/Product");
+      const Product = require("./src/models/Product");
       const product = await Product.findById(productId).select("stock");
       socket.emit("product:stockUpdate", { productId, stock: product?.stock ?? 0 });
     } catch {}

@@ -2,6 +2,9 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../services/mail.service");
+const { OAuth2Client } = require("google-auth-library");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "15m" });
@@ -22,59 +25,87 @@ const setRefreshCookie = (res, token) => {
 const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
-
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ success: false, message: "Email already registered" });
 
     const verifyToken = crypto.randomBytes(32).toString("hex");
     const user = await User.create({ name, email, password, emailVerifyToken: verifyToken });
 
-    // ✅ Email failure should NOT block registration
-    try {
-      await sendVerificationEmail(user, verifyToken);
-    } catch (emailErr) {
-      console.warn("⚠️  Verification email failed (non-critical):", emailErr.message);
-    }
+    try { await sendVerificationEmail(user, verifyToken); }
+    catch (emailErr) { console.warn("⚠️  Verification email failed:", emailErr.message); }
 
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
-
     setRefreshCookie(res, refreshToken);
 
-    res.status(201).json({
-      success: true,
-      message: "Registered successfully.",
-      accessToken,
-      user,
-    });
-  } catch (error) {
-    next(error);
-  }
+    res.status(201).json({ success: true, message: "Registered successfully.", accessToken, user });
+  } catch (error) { next(error); }
 };
 
 // POST /api/auth/login
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
     const user = await User.findOne({ email }).select("+password");
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user || !(await user.comparePassword(password)))
       return res.status(401).json({ success: false, message: "Invalid email or password" });
-    }
     if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
 
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
-
     setRefreshCookie(res, refreshToken);
 
     res.json({ success: true, accessToken, user });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
+};
+
+// POST /api/auth/google
+const googleAuth = async (req, res, next) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) return res.status(400).json({ success: false, message: "No credential provided" });
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const { name, email, picture, sub: googleId } = ticket.getPayload();
+
+    let user = await User.findOne({ email });
+
+    if (user) {
+      // Existing user — link Google if not linked yet
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.avatar = user.avatar || picture;
+        await user.save({ validateBeforeSave: false });
+      }
+    } else {
+      // New user via Google
+      user = await User.create({
+        name,
+        email,
+        googleId,
+        avatar: picture,
+        isVerified: true,
+        password: crypto.randomBytes(32).toString("hex"), // random password
+      });
+    }
+
+    if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    await user.save({ validateBeforeSave: false });
+    setRefreshCookie(res, refreshToken);
+
+    res.json({ success: true, accessToken, user });
+  } catch (error) { next(error); }
 };
 
 // POST /api/auth/refresh
@@ -85,32 +116,25 @@ const refreshToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id).select("+refreshToken");
-    if (!user || user.refreshToken !== token) {
+    if (!user || user.refreshToken !== token)
       return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
 
     const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
     user.refreshToken = newRefreshToken;
     await user.save({ validateBeforeSave: false });
-
     setRefreshCookie(res, newRefreshToken);
+
     res.json({ success: true, accessToken });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 // POST /api/auth/logout
 const logout = async (req, res, next) => {
   try {
-    if (req.user) {
-      await User.findByIdAndUpdate(req.user._id, { refreshToken: null });
-    }
+    if (req.user) await User.findByIdAndUpdate(req.user._id, { refreshToken: null });
     res.clearCookie("refreshToken");
     res.json({ success: true, message: "Logged out" });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 // GET /api/auth/verify-email/:token
@@ -118,15 +142,11 @@ const verifyEmail = async (req, res, next) => {
   try {
     const user = await User.findOne({ emailVerifyToken: req.params.token });
     if (!user) return res.status(400).json({ success: false, message: "Invalid or expired token" });
-
     user.isVerified = true;
     user.emailVerifyToken = undefined;
     await user.save({ validateBeforeSave: false });
-
     res.json({ success: true, message: "Email verified successfully" });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 // POST /api/auth/forgot-password
@@ -140,17 +160,11 @@ const forgotPassword = async (req, res, next) => {
     user.passwordResetExpires = Date.now() + 60 * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
-    // ✅ Email failure should NOT block password reset flow
-    try {
-      await sendPasswordResetEmail(user, token);
-    } catch (emailErr) {
-      console.warn("⚠️  Reset email failed (non-critical):", emailErr.message);
-    }
+    try { await sendPasswordResetEmail(user, token); }
+    catch (emailErr) { console.warn("⚠️  Reset email failed:", emailErr.message); }
 
     res.json({ success: true, message: "Password reset email sent" });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 // POST /api/auth/reset-password/:token
@@ -161,21 +175,15 @@ const resetPassword = async (req, res, next) => {
       passwordResetExpires: { $gt: Date.now() },
     });
     if (!user) return res.status(400).json({ success: false, message: "Invalid or expired token" });
-
     user.password = req.body.password;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();
-
     res.json({ success: true, message: "Password reset successful" });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 // GET /api/auth/me
-const getMe = async (req, res) => {
-  res.json({ success: true, user: req.user });
-};
+const getMe = async (req, res) => res.json({ success: true, user: req.user });
 
-module.exports = { register, login, refreshToken, logout, verifyEmail, forgotPassword, resetPassword, getMe };
+module.exports = { register, login, googleAuth, refreshToken, logout, verifyEmail, forgotPassword, resetPassword, getMe };

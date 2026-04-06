@@ -1,5 +1,6 @@
+const mongoose = require("mongoose");
 const Product = require("../models/Product");
-const Category = require("../models/Category"); // ✅ Fix 1: Category import
+const Category = require("../models/Category");
 const { cache } = require("../config/cache");
 const { uploadToCloudinary } = require("../middlewares/upload.middleware");
 const { generateEmbedding, cosineSimilarity, generateProductDescription, askProductAssistant, askProductAssistantStream } = require("../services/ai.service");
@@ -15,7 +16,6 @@ const getProducts = async (req, res, next) => {
 
     const filter = { isActive: true };
 
-    // ✅ Fix 2: category string → ObjectId via slug or name lookup
     if (category) {
       const cat = await Category.findOne({
         $or: [
@@ -35,7 +35,6 @@ const getProducts = async (req, res, next) => {
       if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
 
-    // ✅ Fix 3: regex search instead of $text (no index needed)
     if (search) {
       filter.$or = [
         { name: new RegExp(search, "i") },

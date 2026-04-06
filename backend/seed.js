@@ -176,7 +176,7 @@ async function seed() {
   // 6. Bulk insert products
   await Product.insertMany(seeded, { ordered: false });
   console.log(`✅  Seeded ${seeded.length} products!\n`);
-
+  
   // 7. Update category product counts
   for (const cat of catDocs) {
     const count = await Product.countDocuments({ category: cat._id });

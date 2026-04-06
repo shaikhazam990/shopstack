@@ -6,7 +6,7 @@ import useProducts from "../hooks/useProducts";
 import Loader from "../../../shared/components/Loader";
 import styles from "./PLPPage.module.css";
 
-const CATEGORIES = ["All", "Smartphones", "Laptops", "Fragrances", "Skincare", "Furniture", "Tops", "Watches", "Sunglasses"];
+const CATEGORIES = ["All", "Smartphones", "Laptops", "Fragrances", "Skincare", "Furniture", "Tops", "lighting", "Sunglasses"];
 const SORT_OPTIONS = [
   { label: "Featured", value: "newest" },
   { label: "Price: Low → High", value: "price_asc" },
